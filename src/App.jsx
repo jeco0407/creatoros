@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { supabase } from "./lib/supabase.js";
 
 /* ============================================================
    ICONS — minimal, consistent 1.75px stroke line icon set
@@ -56,14 +57,6 @@ const NAV_ITEMS = [
   { key: "settings", label: "設定", icon: I.settings },
 ];
 
-const TODAY_TASKS = [
-  { id: 1, time: "12:00", title: "發布 IG 貼文", tag: "發布", icon: I.image, done: false, urgent: true },
-  { id: 2, time: "14:30", title: "Threads 草稿撰寫", tag: "創作", icon: I.fileText, done: false },
-  { id: 3, time: "明天", title: "YouTube 腳本完成", tag: "創作", icon: I.video, done: false },
-  { id: 4, time: "今天", title: "回覆客戶訊息（2 位）", tag: "客戶", icon: I.users, done: false },
-  { id: 5, time: "16:00", title: "與王先生會議", tag: "會議", icon: I.calendar, done: false },
-];
-
 const WEEK_DAYS = [
   { d: "7/15", w: "一", today: false },
   { d: "7/16", w: "二", today: false },
@@ -93,18 +86,6 @@ const PLATFORM_STYLES = {
   blog: { bg: "bg-sky-500", label: "✎" },
   meeting: { bg: "bg-emerald-500", label: "☰" },
 };
-
-const PROJECTS = [
-  { id: 1, title: "保險知識系列影片", sub: "YouTube", progress: 65, hue: "from-indigo-500 to-brand-500" },
-  { id: 2, title: "「慢一點也沒關係」系列貼文", sub: "社群貼文", progress: 40, hue: "from-orange-400 to-rose-400" },
-  { id: 3, title: "2026 演講簡報", sub: "簡報設計", progress: 80, hue: "from-emerald-400 to-teal-500" },
-];
-
-const IDEAS = [
-  { id: 1, title: "人生有時候就是這樣⋯", source: "來自 IG · 2 小時前", tag: "故事" },
-  { id: 2, title: "保險理賠的真實案例", source: "來自 客戶對話 · 5 小時前", tag: "保險" },
-  { id: 3, title: "如何建立個人品牌", source: "來自 YouTube · 1 天前", tag: "品牌" },
-];
 
 const CAPTURES = [
   { id: 1, title: "這支影片很有啟發！", source: "YouTube · 2 小時前", icon: I.video, hue: "from-rose-400 to-orange-300" },
@@ -185,7 +166,12 @@ function BigAreaChart() {
 /* ============================================================
    SIDEBAR
    ============================================================ */
-function Sidebar({ active, setActive }) {
+function Sidebar({ active, setActive, profile, onSignOut }) {
+  const displayName = profile?.display_name || "創作者";
+  const plan = profile?.plan || "Pro 方案";
+  const usedGb = profile?.storage_used_gb ?? 0;
+  const limitGb = profile?.storage_limit_gb ?? 100;
+  const usedPct = Math.min(100, Math.round((usedGb / limitGb) * 100));
   return (
     <aside className="hidden lg:flex flex-col w-[264px] shrink-0 h-screen sticky top-0 sidebar-surface text-white/90">
       <div className="px-6 pt-7 pb-6">
@@ -235,21 +221,23 @@ function Sidebar({ active, setActive }) {
         <div className="rounded-2xl bg-white/[0.05] border border-white/[0.07] p-3.5 mb-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-300 to-brand-600 flex items-center justify-center text-[13px] font-semibold shrink-0">
-              阿信
+              {displayName.slice(0, 2)}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-semibold text-white truncate">阿信</p>
-              <p className="text-[11px] text-brand-300/90 font-medium">Pro 方案</p>
+              <p className="text-[13px] font-semibold text-white truncate">{displayName}</p>
+              <p className="text-[11px] text-brand-300/90 font-medium">{plan}</p>
             </div>
-            <Icon path={I.logout} className="w-4 h-4 text-white/30" />
+            <button onClick={onSignOut} title="登出" className="text-white/30 hover:text-white/80 transition">
+              <Icon path={I.logout} className="w-4 h-4" />
+            </button>
           </div>
           <div className="mt-3">
             <div className="flex justify-between text-[10.5px] text-white/40 mb-1.5">
-              <span>已使用 68.2 GB</span>
-              <span>100 GB</span>
+              <span>已使用 {usedGb} GB</span>
+              <span>{limitGb} GB</span>
             </div>
             <div className="h-1.5 rounded-full bg-white/[0.08] overflow-hidden">
-              <div className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-300" style={{ width: "68%" }}></div>
+              <div className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-300" style={{ width: `${usedPct}%` }}></div>
             </div>
           </div>
         </div>
@@ -264,7 +252,7 @@ function Sidebar({ active, setActive }) {
 /* ============================================================
    HEADER
    ============================================================ */
-function Header() {
+function Header({ displayName }) {
   const [dateStr, setDateStr] = useState("");
   useEffect(() => {
     const now = new Date();
@@ -276,7 +264,7 @@ function Header() {
     <header className="rise-in flex items-start justify-between gap-6 mb-8" style={{ animationDelay: "0.02s" }}>
       <div>
         <h1 className="font-display text-[34px] leading-tight text-ink-900 tracking-tight">
-          早安，阿信 <span className="inline-block animate-[floatSlow_2.5s_ease-in-out_infinite]">👋</span>
+          早安，{displayName} <span className="inline-block animate-[floatSlow_2.5s_ease-in-out_infinite]">👋</span>
         </h1>
         <p className="text-[14px] text-ink-900/45 mt-1.5 font-medium">{dateStr || "今天是美好的一天"}</p>
       </div>
@@ -307,7 +295,7 @@ function Header() {
         </button>
         <div className="w-10 h-10 rounded-xl overflow-hidden ring-1 ring-ink-900/[0.06] shadow-soft-sm cursor-pointer">
           <div className="w-full h-full bg-gradient-to-br from-brand-300 to-brand-600 flex items-center justify-center text-white text-[13px] font-semibold">
-            阿
+            {displayName.slice(0, 1)}
           </div>
         </div>
       </div>
@@ -318,9 +306,7 @@ function Header() {
 /* ============================================================
    ROW 1 — Today / AI Suggestion / Weekly Stats
    ============================================================ */
-function TodayTasksCard() {
-  const [tasks, setTasks] = useState(TODAY_TASKS);
-  const toggle = (id) => setTasks((t) => t.map((x) => (x.id === id ? { ...x, done: !x.done } : x)));
+function TodayTasksCard({ tasks, loading, onToggle }) {
   const doneCount = tasks.filter((t) => t.done).length;
 
   return (
@@ -329,33 +315,43 @@ function TodayTasksCard() {
         <h3 className="font-display text-[17px] text-ink-900 flex items-center gap-2">今日待辦</h3>
         <span className="text-[11.5px] font-semibold text-ink-900/40 tabular">{doneCount}/{tasks.length}</span>
       </div>
-      <ul className="space-y-1 flex-1">
-        {tasks.map((task) => (
-          <li key={task.id}>
-            <button
-              onClick={() => toggle(task.id)}
-              className="w-full flex items-center gap-3 py-2 px-2 -mx-2 rounded-xl hover:bg-ink-900/[0.03] transition text-left group"
-            >
-              <span
-                className={`task-check shrink-0 w-[19px] h-[19px] rounded-full border-[1.75px] flex items-center justify-center ${
-                  task.done ? "bg-brand-500 border-brand-500" : "border-ink-900/20 group-hover:border-brand-400"
-                }`}
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center py-8">
+          <span className="text-[12.5px] text-ink-900/30 font-medium">載入中...</span>
+        </div>
+      ) : tasks.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center py-8">
+          <span className="text-[12.5px] text-ink-900/30 font-medium">今天沒有待辦事項 🎉</span>
+        </div>
+      ) : (
+        <ul className="space-y-1 flex-1">
+          {tasks.map((task) => (
+            <li key={task.id}>
+              <button
+                onClick={() => onToggle(task.id)}
+                className="w-full flex items-center gap-3 py-2 px-2 -mx-2 rounded-xl hover:bg-ink-900/[0.03] transition text-left group"
               >
-                {task.done && <Icon path={I.check} className="w-3 h-3 text-white" strokeWidth={2.5} />}
-              </span>
-              <span className="w-6 h-6 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
-                <Icon path={task.icon} className="w-[13px] h-[13px]" />
-              </span>
-              <span className={`flex-1 text-[13.5px] font-medium truncate ${task.done ? "line-through text-ink-900/30" : "text-ink-900/85"}`}>
-                {task.title}
-              </span>
-              <span className={`text-[11px] font-semibold tabular shrink-0 ${task.urgent && !task.done ? "text-brand-600" : "text-ink-900/35"}`}>
-                {task.time}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+                <span
+                  className={`task-check shrink-0 w-[19px] h-[19px] rounded-full border-[1.75px] flex items-center justify-center ${
+                    task.done ? "bg-brand-500 border-brand-500" : "border-ink-900/20 group-hover:border-brand-400"
+                  }`}
+                >
+                  {task.done && <Icon path={I.check} className="w-3 h-3 text-white" strokeWidth={2.5} />}
+                </span>
+                <span className="w-6 h-6 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+                  <Icon path={I[task.icon] || I.fileText} className="w-[13px] h-[13px]" />
+                </span>
+                <span className={`flex-1 text-[13.5px] font-medium truncate ${task.done ? "line-through text-ink-900/30" : "text-ink-900/85"}`}>
+                  {task.title}
+                </span>
+                <span className={`text-[11px] font-semibold tabular shrink-0 ${task.urgent && !task.done ? "text-brand-600" : "text-ink-900/35"}`}>
+                  {task.task_time}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <button className="mt-4 flex items-center justify-center gap-1.5 text-[12.5px] font-semibold text-brand-600 hover:text-brand-700 transition py-1">
         查看全部待辦
         <Icon path={I.arrowRight} className="w-3.5 h-3.5" />
@@ -542,7 +538,7 @@ function ContentCalendar() {
 /* ============================================================
    ROW 3 — Active Projects / Ideas at a glance
    ============================================================ */
-function ActiveProjects() {
+function ActiveProjects({ projects, loading }) {
   return (
     <div className="rise-in lift-card glass rounded-3xl shadow-soft p-6" style={{ animationDelay: "0.32s" }}>
       <div className="flex items-center justify-between mb-5">
@@ -552,26 +548,32 @@ function ActiveProjects() {
           <Icon path={I.arrowRight} className="w-3.5 h-3.5" />
         </button>
       </div>
-      <ul className="space-y-1.5">
-        {PROJECTS.map((p) => (
-          <li key={p.id} className="flex items-center gap-3.5 p-2 -mx-2 rounded-2xl hover:bg-ink-900/[0.03] transition cursor-pointer">
-            <div className={`w-12 h-12 rounded-xl shrink-0 bg-gradient-to-br ${p.hue} shadow-soft-sm`}></div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13.5px] font-semibold text-ink-900/85 truncate">{p.title}</p>
-              <p className="text-[11.5px] text-ink-900/40 font-medium mb-1.5">{p.sub}</p>
-              <div className="h-1.5 rounded-full bg-ink-900/[0.06] overflow-hidden">
-                <div className={`h-full rounded-full bg-gradient-to-r ${p.hue}`} style={{ width: `${p.progress}%` }}></div>
+      {loading ? (
+        <div className="py-8 text-center text-[12.5px] text-ink-900/30 font-medium">載入中...</div>
+      ) : projects.length === 0 ? (
+        <div className="py-8 text-center text-[12.5px] text-ink-900/30 font-medium">還沒有專案，開始建立第一個吧</div>
+      ) : (
+        <ul className="space-y-1.5">
+          {projects.map((p) => (
+            <li key={p.id} className="flex items-center gap-3.5 p-2 -mx-2 rounded-2xl hover:bg-ink-900/[0.03] transition cursor-pointer">
+              <div className={`w-12 h-12 rounded-xl shrink-0 bg-gradient-to-br ${p.hue} shadow-soft-sm`}></div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13.5px] font-semibold text-ink-900/85 truncate">{p.title}</p>
+                <p className="text-[11.5px] text-ink-900/40 font-medium mb-1.5">{p.subtitle}</p>
+                <div className="h-1.5 rounded-full bg-ink-900/[0.06] overflow-hidden">
+                  <div className={`h-full rounded-full bg-gradient-to-r ${p.hue}`} style={{ width: `${p.progress}%` }}></div>
+                </div>
               </div>
-            </div>
-            <span className="text-[12.5px] font-bold text-ink-900/60 tabular shrink-0">{p.progress}%</span>
-          </li>
-        ))}
-      </ul>
+              <span className="text-[12.5px] font-bold text-ink-900/60 tabular shrink-0">{p.progress}%</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
 
-function IdeasGlance() {
+function IdeasGlance({ ideas, loading }) {
   return (
     <div className="rise-in lift-card glass rounded-3xl shadow-soft p-6" style={{ animationDelay: "0.38s" }}>
       <div className="flex items-center justify-between mb-5">
@@ -581,22 +583,28 @@ function IdeasGlance() {
           <Icon path={I.arrowRight} className="w-3.5 h-3.5" />
         </button>
       </div>
-      <ul className="space-y-1.5">
-        {IDEAS.map((idea) => (
-          <li key={idea.id} className="flex items-center gap-3 p-2 -mx-2 rounded-2xl hover:bg-ink-900/[0.03] transition cursor-pointer group">
-            <span className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 group-hover:bg-brand-100 transition">
-              <Icon path={I.bulb} className="w-4 h-4" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13.5px] font-semibold text-ink-900/85 truncate">{idea.title}</p>
-              <p className="text-[11px] text-ink-900/40 font-medium">{idea.source}</p>
-            </div>
-            <span className="text-[10.5px] font-semibold text-brand-600 bg-brand-50 rounded-full px-2 py-1 shrink-0">
-              {idea.tag}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {loading ? (
+        <div className="py-8 text-center text-[12.5px] text-ink-900/30 font-medium">載入中...</div>
+      ) : ideas.length === 0 ? (
+        <div className="py-8 text-center text-[12.5px] text-ink-900/30 font-medium">還沒有靈感，用右側快速收集開始吧</div>
+      ) : (
+        <ul className="space-y-1.5">
+          {ideas.map((idea) => (
+            <li key={idea.id} className="flex items-center gap-3 p-2 -mx-2 rounded-2xl hover:bg-ink-900/[0.03] transition cursor-pointer group">
+              <span className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 group-hover:bg-brand-100 transition">
+                <Icon path={I.bulb} className="w-4 h-4" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13.5px] font-semibold text-ink-900/85 truncate">{idea.title}</p>
+                <p className="text-[11px] text-ink-900/40 font-medium">{idea.source}</p>
+              </div>
+              <span className="text-[10.5px] font-semibold text-brand-600 bg-brand-50 rounded-full px-2 py-1 shrink-0">
+                {idea.tag}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -700,21 +708,224 @@ function RecentCaptures() {
 }
 
 /* ============================================================
+   AUTH SCREEN — email + password sign in / sign up
+   ============================================================ */
+function AuthScreen() {
+  const [mode, setMode] = useState("signin"); // "signin" | "signup"
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setNotice("");
+    setLoading(true);
+    try {
+      if (mode === "signup") {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { display_name: displayName || "創作者" } },
+        });
+        if (signUpError) throw signUpError;
+        setNotice("註冊成功！請check信箱驗證後即可登入。");
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInError) throw signInError;
+      }
+    } catch (err) {
+      setError(err.message || "發生錯誤，請再試一次");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="app-canvas min-h-screen flex items-center justify-center px-6">
+      <div className="rise-in w-full max-w-[400px]">
+        <div className="flex items-center justify-center gap-2.5 mb-8">
+          <div className="w-10 h-10 rounded-[10px] shimmer-orb flex items-center justify-center shadow-glow-brand">
+            <span className="font-display italic text-white text-xl font-semibold">C</span>
+          </div>
+          <span className="font-display text-[22px] tracking-tight text-ink-900">
+            Creator <span className="text-brand-600 italic">OS</span>
+          </span>
+        </div>
+
+        <div className="glass rounded-3xl shadow-soft-lg p-7">
+          <h1 className="font-display text-[22px] text-ink-900 mb-1.5">
+            {mode === "signin" ? "歡迎回來" : "建立你的帳號"}
+          </h1>
+          <p className="text-[13px] text-ink-900/45 font-medium mb-6">
+            {mode === "signin" ? "登入以繼續你的創作旅程" : "開始你的 AI 創作控制中心"}
+          </p>
+
+          <form onSubmit={submit} className="space-y-3.5">
+            {mode === "signup" && (
+              <div>
+                <label className="text-[12px] font-semibold text-ink-900/55 mb-1.5 block">暱稱</label>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="阿信"
+                  className="w-full bg-white/70 border border-ink-900/[0.08] rounded-xl px-3.5 py-2.5 text-[13.5px] text-ink-900 placeholder:text-ink-900/30 focus:outline-none focus:ring-2 focus:ring-brand-300/50 transition"
+                />
+              </div>
+            )}
+            <div>
+              <label className="text-[12px] font-semibold text-ink-900/55 mb-1.5 block">Email</label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full bg-white/70 border border-ink-900/[0.08] rounded-xl px-3.5 py-2.5 text-[13.5px] text-ink-900 placeholder:text-ink-900/30 focus:outline-none focus:ring-2 focus:ring-brand-300/50 transition"
+              />
+            </div>
+            <div>
+              <label className="text-[12px] font-semibold text-ink-900/55 mb-1.5 block">密碼</label>
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="至少 6 個字元"
+                className="w-full bg-white/70 border border-ink-900/[0.08] rounded-xl px-3.5 py-2.5 text-[13.5px] text-ink-900 placeholder:text-ink-900/30 focus:outline-none focus:ring-2 focus:ring-brand-300/50 transition"
+              />
+            </div>
+
+            {error && <p className="text-[12.5px] text-rose-500 font-medium">{error}</p>}
+            {notice && <p className="text-[12.5px] text-emerald-600 font-medium">{notice}</p>}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="sheen w-full rounded-xl bg-gradient-to-r from-brand-500 to-brand-400 text-white text-[13.5px] font-semibold py-3 shadow-glow-brand hover:brightness-110 transition disabled:opacity-60"
+            >
+              {loading ? "處理中..." : mode === "signin" ? "登入" : "註冊"}
+            </button>
+          </form>
+
+          <button
+            onClick={() => {
+              setMode((m) => (m === "signin" ? "signup" : "signin"));
+              setError("");
+              setNotice("");
+            }}
+            className="w-full text-center text-[12.5px] font-semibold text-ink-900/45 hover:text-brand-600 transition mt-5"
+          >
+            {mode === "signin" ? "還沒有帳號？註冊" : "已經有帳號了？登入"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    APP SHELL
    ============================================================ */
 function App() {
   const [active, setActive] = useState("home");
+  const [authLoading, setAuthLoading] = useState(true);
+  const [session, setSession] = useState(null);
+
+  const [profile, setProfile] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [ideas, setIdeas] = useState([]);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthLoading(false);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!session) {
+      setProfile(null);
+      setTasks([]);
+      setProjects([]);
+      setIdeas([]);
+      return;
+    }
+
+    let cancelled = false;
+    setDataLoading(true);
+
+    (async () => {
+      const userId = session.user.id;
+      const [profileRes, tasksRes, projectsRes, ideasRes] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", userId).single(),
+        supabase.from("tasks").select("*").eq("user_id", userId).order("position"),
+        supabase.from("projects").select("*").eq("user_id", userId).order("position"),
+        supabase.from("ideas").select("*").eq("user_id", userId).order("position"),
+      ]);
+      if (cancelled) return;
+      if (profileRes.data) setProfile(profileRes.data);
+      if (tasksRes.data) setTasks(tasksRes.data);
+      if (projectsRes.data) setProjects(projectsRes.data);
+      if (ideasRes.data) setIdeas(ideasRes.data);
+      setDataLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
+  const toggleTask = async (id) => {
+    const target = tasks.find((t) => t.id === id);
+    if (!target) return;
+    const nextDone = !target.done;
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: nextDone } : t)));
+    const { error } = await supabase.from("tasks").update({ done: nextDone }).eq("id", id);
+    if (error) {
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: !nextDone } : t)));
+    }
+  };
+
+  const signOut = () => supabase.auth.signOut();
+
+  if (authLoading) {
+    return (
+      <div className="app-canvas min-h-screen flex items-center justify-center">
+        <div className="w-10 h-10 rounded-[10px] shimmer-orb flex items-center justify-center shadow-glow-brand">
+          <span className="font-display italic text-white text-lg font-semibold">C</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <AuthScreen />;
+  }
+
+  const displayName = profile?.display_name || "創作者";
 
   return (
     <div className="app-canvas min-h-screen flex">
-      <Sidebar active={active} setActive={setActive} />
+      <Sidebar active={active} setActive={setActive} profile={profile} onSignOut={signOut} />
 
       <div className="flex-1 min-w-0 relative z-[1] flex">
         <main className="flex-1 min-w-0 px-6 lg:px-10 py-8 max-w-[1180px]">
-          <Header />
+          <Header displayName={displayName} />
 
           <section className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
-            <TodayTasksCard />
+            <TodayTasksCard tasks={tasks} loading={dataLoading} onToggle={toggleTask} />
             <AISuggestionCard />
             <WeeklyStatsCard />
           </section>
@@ -724,8 +935,8 @@ function App() {
           </section>
 
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
-            <ActiveProjects />
-            <IdeasGlance />
+            <ActiveProjects projects={projects} loading={dataLoading} />
+            <IdeasGlance ideas={ideas} loading={dataLoading} />
           </section>
 
           <footer className="text-center pb-6">
