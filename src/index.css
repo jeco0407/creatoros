@@ -1,0 +1,206 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #F6F5F9;
+  font-family: 'Plus Jakarta Sans', 'Noto Sans TC', sans-serif;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(124, 92, 255, 0.22);
+  color: #2C1A6E;
+}
+
+/* ---------- Scrollbars ---------- */
+.thin-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: rgba(124, 92, 255, 0.18);
+  border-radius: 999px;
+}
+.thin-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 92, 255, 0.32);
+}
+
+/* ---------- Canvas background: soft gradient mesh + grain ---------- */
+.app-canvas {
+  position: relative;
+  background:
+    radial-gradient(ellipse 900px 500px at 82% -8%, rgba(124,92,255,0.14), transparent 60%),
+    radial-gradient(ellipse 700px 500px at 15% 8%, rgba(255,169,120,0.10), transparent 55%),
+    radial-gradient(ellipse 800px 600px at 60% 100%, rgba(124,92,255,0.06), transparent 60%),
+    #F6F5F9;
+}
+
+.app-canvas::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+
+/* ---------- Sidebar texture ---------- */
+.sidebar-surface {
+  background:
+    radial-gradient(ellipse 420px 260px at 15% 0%, rgba(124,92,255,0.35), transparent 60%),
+    radial-gradient(ellipse 500px 400px at 100% 100%, rgba(124,92,255,0.10), transparent 55%),
+    linear-gradient(180deg, #0C0B12 0%, #0A0910 60%, #08070C 100%);
+}
+
+/* ---------- Glass card ---------- */
+.glass {
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.glass-dark {
+  background: rgba(20, 18, 30, 0.55);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ---------- Card hover lift ---------- */
+.lift-card {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s ease;
+}
+.lift-card:hover {
+  transform: translateY(-3px);
+}
+
+/* ---------- Sheen sweep on hover ---------- */
+.sheen {
+  position: relative;
+  overflow: hidden;
+}
+.sheen::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.35), transparent);
+  transform: skewX(-18deg);
+  transition: left 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.sheen:hover::after {
+  left: 130%;
+}
+
+/* ---------- Fade / rise entrance animation ---------- */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise-in {
+  animation: riseIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(2deg); }
+}
+.float-slow {
+  animation: floatSlow 6s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+.pulse-glow {
+  animation: pulseGlow 2.4s ease-in-out infinite;
+}
+
+@keyframes shimmerOrb {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.shimmer-orb {
+  background: linear-gradient(120deg, #7C5CFF, #B4A0FF, #FF9F6E, #7C5CFF);
+  background-size: 300% 300%;
+  animation: shimmerOrb 6s ease infinite;
+}
+
+/* ---------- Nav item ---------- */
+.nav-item {
+  position: relative;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+.nav-item .nav-indicator {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
+}
+
+/* ---------- Editorial number ---------- */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.font-display {
+  font-family: 'Fraunces', 'Noto Serif TC', serif;
+}
+
+/* ---------- Divider dot ---------- */
+.dot::before {
+  content: "·";
+  margin: 0 6px;
+  opacity: 0.4;
+}
+
+/* ---------- Progress bar shimmer ---------- */
+@keyframes progressShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.progress-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+  animation: progressShimmer 2.2s ease-in-out infinite;
+}
+
+/* ---------- Custom checkbox ---------- */
+.task-check {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ---------- Marquee for AI assistant suggestion chips ---------- */
+.ai-chip {
+  transition: transform 0.25s cubic-bezier(0.16,1,0.3,1), background-color 0.25s ease, border-color 0.25s ease;
+}
+.ai-chip:hover {
+  transform: translateX(3px);
+}
+
+.text-balance {
+  text-wrap: balance;
+}
