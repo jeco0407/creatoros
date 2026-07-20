@@ -57,26 +57,33 @@ const NAV_ITEMS = [
   { key: "settings", label: "設定", icon: I.settings },
 ];
 
-const WEEK_DAYS = [
-  { d: "7/15", w: "一", today: false },
-  { d: "7/16", w: "二", today: false },
-  { d: "7/17", w: "三", today: false },
-  { d: "7/18", w: "四", today: false },
-  { d: "7/19", w: "五", today: false },
-  { d: "7/20", w: "六", today: true },
-  { d: "7/21", w: "日", today: false },
-];
+const WEEKDAY_LABELS = ["一", "二", "三", "四", "五", "六", "日"];
 
-const CAL_SEED = [
-  { id: "c1", day: 0, time: "12:00", title: "IG 貼文", platform: "ig" },
-  { id: "c2", day: 0, time: "14:30", title: "Threads", platform: "threads" },
-  { id: "c3", day: 1, time: "10:00", title: "YouTube", platform: "yt" },
-  { id: "c4", day: 1, time: "20:00", title: "Reels", platform: "ig" },
-  { id: "c5", day: 2, time: "09:00", title: "Podcast", platform: "podcast" },
-  { id: "c6", day: 2, time: "18:00", title: "IG 限動", platform: "ig" },
-  { id: "c7", day: 3, time: "11:00", title: "部落格文章", platform: "blog" },
-  { id: "c8", day: 4, time: "15:00", title: "客戶會議", platform: "meeting" },
-];
+function toISODate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// Monday-start week containing "today", using real calendar dates.
+function getWeekDays() {
+  const now = new Date();
+  const dow = (now.getDay() + 6) % 7; // 0 = Monday
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - dow);
+
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+    return {
+      iso: toISODate(date),
+      d: `${date.getMonth() + 1}/${date.getDate()}`,
+      w: WEEKDAY_LABELS[i],
+      today: toISODate(date) === toISODate(now),
+    };
+  });
+}
 
 const PLATFORM_STYLES = {
   ig: { bg: "bg-gradient-to-br from-pink-400 to-orange-300", label: "IG" },
@@ -87,11 +94,14 @@ const PLATFORM_STYLES = {
   meeting: { bg: "bg-emerald-500", label: "☰" },
 };
 
-const CAPTURES = [
-  { id: 1, title: "這支影片很有啟發！", source: "YouTube · 2 小時前", icon: I.video, hue: "from-rose-400 to-orange-300" },
-  { id: 2, title: "一篇很棒的文章", source: "medium.com · 5 小時前", icon: I.link, hue: "from-sky-400 to-indigo-400" },
-  { id: 3, title: "客戶傳來的檔案", source: "PDF · 昨天", icon: I.fileText, hue: "from-emerald-400 to-teal-400" },
-];
+const CAPTURE_TYPE_META = {
+  url: { icon: I.link, hue: "from-sky-400 to-indigo-400" },
+  article: { icon: I.fileText, hue: "from-emerald-400 to-teal-400" },
+  video: { icon: I.video, hue: "from-rose-400 to-orange-300" },
+  voice: { icon: I.mic, hue: "from-violet-400 to-brand-500" },
+  file: { icon: I.folder, hue: "from-amber-400 to-orange-400" },
+  shot: { icon: I.camera, hue: "from-slate-400 to-slate-600" },
+};
 
 const AI_QUICK_ACTIONS = [
   { id: 1, label: "幫我生成一篇 IG 貼文", icon: I.image },
@@ -451,21 +461,23 @@ function WeeklyStatsCard() {
 /* ============================================================
    ROW 2 — Content Calendar (draggable weekly timeline)
    ============================================================ */
-function ContentCalendar() {
-  const [items, setItems] = useState(CAL_SEED);
+function ContentCalendar({ weekDays, events, loading, onReschedule, onQuickAdd }) {
   const [dragId, setDragId] = useState(null);
   const [overDay, setOverDay] = useState(null);
 
   const grouped = useMemo(() => {
-    const g = Array.from({ length: 7 }, () => []);
-    items.forEach((it) => g[it.day].push(it));
-    g.forEach((col) => col.sort((a, b) => a.time.localeCompare(b.time)));
-    return g;
-  }, [items]);
+    const map = {};
+    weekDays.forEach((day) => (map[day.iso] = []));
+    events.forEach((ev) => {
+      if (map[ev.event_date]) map[ev.event_date].push(ev);
+    });
+    Object.values(map).forEach((col) => col.sort((a, b) => (a.event_time || "").localeCompare(b.event_time || "")));
+    return map;
+  }, [weekDays, events]);
 
-  const onDrop = (dayIdx) => {
+  const onDrop = (iso) => {
     if (dragId == null) return;
-    setItems((prev) => prev.map((it) => (it.id === dragId ? { ...it, day: dayIdx } : it)));
+    onReschedule(dragId, iso);
     setDragId(null);
     setOverDay(null);
   };
@@ -481,12 +493,12 @@ function ContentCalendar() {
       </div>
 
       <div className="grid grid-cols-7 gap-2.5">
-        {WEEK_DAYS.map((day, idx) => (
+        {weekDays.map((day, idx) => (
           <div
-            key={day.d}
+            key={day.iso}
             onDragOver={(e) => { e.preventDefault(); setOverDay(idx); }}
             onDragLeave={() => setOverDay((d) => (d === idx ? null : d))}
-            onDrop={() => onDrop(idx)}
+            onDrop={() => onDrop(day.iso)}
             className={`rounded-2xl p-2.5 min-h-[168px] flex flex-col gap-1.5 transition-colors ${
               day.today ? "bg-brand-50 ring-1 ring-brand-200" : overDay === idx ? "bg-brand-50/60" : "bg-ink-900/[0.025]"
             }`}
@@ -497,13 +509,13 @@ function ContentCalendar() {
                 {day.d}{day.today && <span className="ml-1 text-brand-500">今</span>}
               </span>
             </div>
-            {grouped[idx].length === 0 && idx === 6 && (
+            {!loading && grouped[day.iso]?.length === 0 && idx === 6 && (
               <div className="flex-1 flex items-center justify-center">
                 <span className="text-[11px] text-ink-900/25 font-medium">休息日</span>
               </div>
             )}
-            {grouped[idx].map((ev) => {
-              const style = PLATFORM_STYLES[ev.platform];
+            {(grouped[day.iso] || []).map((ev) => {
+              const style = PLATFORM_STYLES[ev.platform] || PLATFORM_STYLES.ig;
               return (
                 <div
                   key={ev.id}
@@ -517,17 +529,18 @@ function ContentCalendar() {
                   </span>
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold text-ink-900/80 truncate leading-tight">{ev.title}</p>
-                    <p className="text-[9.5px] text-ink-900/35 tabular leading-tight">{ev.time}</p>
+                    <p className="text-[9.5px] text-ink-900/35 tabular leading-tight">{ev.event_time}</p>
                   </div>
                 </div>
               );
             })}
-            {idx !== 6 && (
-              <button className="mt-auto flex items-center gap-1 text-[10.5px] text-ink-900/25 hover:text-brand-500 font-medium py-1 transition">
-                <Icon path={I.plus} className="w-3 h-3" />
-                新增內容
-              </button>
-            )}
+            <button
+              onClick={() => onQuickAdd(day.iso)}
+              className="mt-auto flex items-center gap-1 text-[10.5px] text-ink-900/25 hover:text-brand-500 font-medium py-1 transition"
+            >
+              <Icon path={I.plus} className="w-3 h-3" />
+              新增內容
+            </button>
           </div>
         ))}
       </div>
@@ -658,7 +671,7 @@ function AIAssistantPanel() {
   );
 }
 
-function QuickCapturePanel() {
+function QuickCapturePanel({ onCapture }) {
   return (
     <div className="rise-in glass rounded-3xl shadow-soft p-5" style={{ animationDelay: "0.16s" }}>
       <h3 className="font-display text-[16px] text-ink-900 mb-4">快速收集</h3>
@@ -666,6 +679,7 @@ function QuickCapturePanel() {
         {QUICK_CAPTURE.map((c) => (
           <button
             key={c.id}
+            onClick={() => onCapture(c.id)}
             className="flex flex-col items-center justify-center gap-1.5 py-3.5 rounded-2xl bg-ink-900/[0.03] hover:bg-brand-50 border border-transparent hover:border-brand-200 transition group"
           >
             <span className="w-8 h-8 rounded-xl bg-white shadow-soft-sm flex items-center justify-center text-ink-900/55 group-hover:text-brand-600 transition">
@@ -675,12 +689,24 @@ function QuickCapturePanel() {
           </button>
         ))}
       </div>
-      <p className="text-center text-[11px] text-ink-900/30 font-medium mt-2">拖曳即可加入</p>
+      <p className="text-center text-[11px] text-ink-900/30 font-medium mt-2">點擊新增一筆收藏</p>
     </div>
   );
 }
 
-function RecentCaptures() {
+function formatRelativeTime(iso) {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "剛剛";
+  if (mins < 60) return `${mins} 分鐘前`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} 小時前`;
+  const days = Math.floor(hours / 24);
+  if (days < 2) return "昨天";
+  return `${days} 天前`;
+}
+
+function RecentCaptures({ captures, loading }) {
   return (
     <div className="rise-in glass rounded-3xl shadow-soft p-5" style={{ animationDelay: "0.22s" }}>
       <div className="flex items-center justify-between mb-4">
@@ -690,19 +716,28 @@ function RecentCaptures() {
           <Icon path={I.chevronRight} className="w-3 h-3" />
         </button>
       </div>
-      <ul className="space-y-1">
-        {CAPTURES.map((c) => (
-          <li key={c.id} className="flex items-center gap-3 p-1.5 -mx-1.5 rounded-xl hover:bg-ink-900/[0.03] transition cursor-pointer">
-            <span className={`w-9 h-9 rounded-xl shrink-0 bg-gradient-to-br ${c.hue} flex items-center justify-center text-white shadow-soft-sm`}>
-              <Icon path={c.icon} className="w-4 h-4" strokeWidth={1.9} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[12.5px] font-semibold text-ink-900/85 truncate">{c.title}</p>
-              <p className="text-[10.5px] text-ink-900/40 font-medium">{c.source}</p>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {loading ? (
+        <div className="py-6 text-center text-[12px] text-ink-900/30 font-medium">載入中...</div>
+      ) : captures.length === 0 ? (
+        <div className="py-6 text-center text-[12px] text-ink-900/30 font-medium">還沒有收藏</div>
+      ) : (
+        <ul className="space-y-1">
+          {captures.map((c) => {
+            const meta = CAPTURE_TYPE_META[c.type] || CAPTURE_TYPE_META.article;
+            return (
+              <li key={c.id} className="flex items-center gap-3 p-1.5 -mx-1.5 rounded-xl hover:bg-ink-900/[0.03] transition cursor-pointer">
+                <span className={`w-9 h-9 rounded-xl shrink-0 bg-gradient-to-br ${meta.hue} flex items-center justify-center text-white shadow-soft-sm`}>
+                  <Icon path={meta.icon} className="w-4 h-4" strokeWidth={1.9} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12.5px] font-semibold text-ink-900/85 truncate">{c.title}</p>
+                  <p className="text-[10.5px] text-ink-900/40 font-medium">{c.source || formatRelativeTime(c.created_at)}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
@@ -841,7 +876,11 @@ function App() {
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [ideas, setIdeas] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [captures, setCaptures] = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
+
+  const weekDays = useMemo(() => getWeekDays(), []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -860,6 +899,8 @@ function App() {
       setTasks([]);
       setProjects([]);
       setIdeas([]);
+      setEvents([]);
+      setCaptures([]);
       return;
     }
 
@@ -868,24 +909,30 @@ function App() {
 
     (async () => {
       const userId = session.user.id;
-      const [profileRes, tasksRes, projectsRes, ideasRes] = await Promise.all([
+      const weekStart = weekDays[0].iso;
+      const weekEnd = weekDays[6].iso;
+      const [profileRes, tasksRes, projectsRes, ideasRes, eventsRes, capturesRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", userId).single(),
         supabase.from("tasks").select("*").eq("user_id", userId).order("position"),
         supabase.from("projects").select("*").eq("user_id", userId).order("position"),
         supabase.from("ideas").select("*").eq("user_id", userId).order("position"),
+        supabase.from("calendar_events").select("*").eq("user_id", userId).gte("event_date", weekStart).lte("event_date", weekEnd),
+        supabase.from("captures").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(10),
       ]);
       if (cancelled) return;
       if (profileRes.data) setProfile(profileRes.data);
       if (tasksRes.data) setTasks(tasksRes.data);
       if (projectsRes.data) setProjects(projectsRes.data);
       if (ideasRes.data) setIdeas(ideasRes.data);
+      if (eventsRes.data) setEvents(eventsRes.data);
+      if (capturesRes.data) setCaptures(capturesRes.data);
       setDataLoading(false);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [session, weekDays]);
 
   const toggleTask = async (id) => {
     const target = tasks.find((t) => t.id === id);
@@ -896,6 +943,36 @@ function App() {
     if (error) {
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: !nextDone } : t)));
     }
+  };
+
+  const rescheduleEvent = async (id, newIso) => {
+    const prev = events;
+    setEvents((cur) => cur.map((e) => (e.id === id ? { ...e, event_date: newIso } : e)));
+    const { error } = await supabase.from("calendar_events").update({ event_date: newIso }).eq("id", id);
+    if (error) setEvents(prev);
+  };
+
+  const quickAddEvent = async (iso) => {
+    const title = window.prompt("新增內容標題：");
+    if (!title) return;
+    const { data, error } = await supabase
+      .from("calendar_events")
+      .insert({ user_id: session.user.id, title, event_date: iso, platform: "ig" })
+      .select()
+      .single();
+    if (!error && data) setEvents((cur) => [...cur, data]);
+  };
+
+  const quickCapture = async (type) => {
+    const label = QUICK_CAPTURE.find((c) => c.id === type)?.label || "收藏";
+    const title = window.prompt(`新增${label}標題：`);
+    if (!title) return;
+    const { data, error } = await supabase
+      .from("captures")
+      .insert({ user_id: session.user.id, title, type })
+      .select()
+      .single();
+    if (!error && data) setCaptures((cur) => [data, ...cur]);
   };
 
   const signOut = () => supabase.auth.signOut();
@@ -931,7 +1008,13 @@ function App() {
           </section>
 
           <section className="mb-5">
-            <ContentCalendar />
+            <ContentCalendar
+              weekDays={weekDays}
+              events={events}
+              loading={dataLoading}
+              onReschedule={rescheduleEvent}
+              onQuickAdd={quickAddEvent}
+            />
           </section>
 
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
@@ -948,8 +1031,8 @@ function App() {
 
         <aside className="hidden xl:flex flex-col w-[336px] shrink-0 gap-5 px-5 py-8 h-screen sticky top-0 overflow-y-auto thin-scroll">
           <AIAssistantPanel />
-          <QuickCapturePanel />
-          <RecentCaptures />
+          <QuickCapturePanel onCapture={quickCapture} />
+          <RecentCaptures captures={captures} loading={dataLoading} />
         </aside>
       </div>
     </div>
